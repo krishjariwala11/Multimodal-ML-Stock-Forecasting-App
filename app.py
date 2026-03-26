@@ -32,26 +32,39 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("Advanced Stock Prediction & Forecasting by Krish Jariwala")
-st.markdown("Comparing **9 ML models** and forecasting future prices.")
+st.markdown("Comparing **11 ML models** and forecasting future prices.")
 
 # Sidebar
 st.sidebar.header("Configuration")
 ticker = st.sidebar.text_input("Ticker Symbol", value="AAPL")
-start_date = st.sidebar.date_input("Start Date", value=datetime.now() - timedelta(days=365*2))
-end_date = st.sidebar.date_input("End Date", value=datetime.now())
+
+# Enforce single date inputs by using .date()
+default_start = (datetime.now() - timedelta(days=365*2)).date()
+default_end = datetime.now().date()
+min_date = datetime(1980, 1, 1).date()
+
+start_date = st.sidebar.date_input("Start Date", value=default_start, min_value=min_date, max_value=default_end)
+end_date = st.sidebar.date_input("End Date", value=default_end, min_value=min_date, max_value=default_end)
+
+# Fallback incase Streamlit accidentally returns a tuple (user clicks twice)
+if isinstance(start_date, (tuple, list)): start_date = start_date[0]
+if isinstance(end_date, (tuple, list)): end_date = end_date[-1]
+
 forecast_days = st.sidebar.slider("Forecast Days", min_value=1, max_value=30, value=7)
 
-# Color palette for 9 models
+# Color palette for 11 models
 MODEL_COLORS = {
     'Linear Regression': '#00d4ff',
-    'Ridge Regression': '#8B5CF6',
-    'Lasso Regression': '#EC4899',
+    'Ridge': '#8B5CF6',
+    'Lasso': '#EC4899',
     'Decision Tree': '#F97316',
     'Random Forest': '#ffaa00',
     'Gradient Boosting': '#14B8A6',
     'XGBoost': '#00ff00',
     'SVR': '#EF4444',
-    'KNN Regressor': '#A78BFA',
+    'KNN': '#A78BFA',
+    'ARIMA': '#D946EF',
+    'LSTM': '#FBBF24',
 }
 
 if st.sidebar.button("Run Detailed Analysis"):
@@ -76,11 +89,10 @@ if st.sidebar.button("Run Detailed Analysis"):
             df_feat = engineer_features(df)
             
         feature_cols = ['SMA_20', 'SMA_50', 'RSI_14', 'MACD', 'MACD_Signal', 'ATR_14', 'Close_Lag_1', 'Close_Lag_2', 'Close_Lag_3', 'Returns']
-        X, y = prepare_data_for_ml(df_feat, feature_cols)
         
         # ── Model Training ──
-        with st.spinner("Training 9 models and evaluating..."):
-            results, predictions, y_test, X_test, X_train, y_train, scaler = train_and_evaluate(X, y)
+        with st.spinner("Training 11 models (incl. ARIMA & LSTM) and evaluating..."):
+            results, predictions, true_prices_test, X_test, X_train, y_train, scaler, fitted_models = train_and_evaluate(df_feat, feature_cols)
 
         # ── Train / Test Split Visualization ──
         st.subheader("📊 Train / Test Split Visualization")
@@ -89,24 +101,24 @@ if st.sidebar.button("Run Detailed Analysis"):
         fig_split = go.Figure()
 
         # Training region (Close prices for training dates)
-        train_close = df_feat.loc[y_train.index, 'Close']
-        test_close = df_feat.loc[y_test.index, 'Close']
+        train_close = df_feat.loc[X_train.index, 'Close']
+        test_close = df_feat.loc[X_test.index, 'Close']
 
         fig_split.add_trace(go.Scatter(
             x=train_close.index, y=train_close.values,
-            name=f'Training Data ({len(y_train)} samples)',
+            name=f'Training Data ({len(X_train)} samples)',
             line=dict(color='#00d4ff', width=2),
             fill='tozeroy', fillcolor='rgba(0,212,255,0.08)'
         ))
         fig_split.add_trace(go.Scatter(
             x=test_close.index, y=test_close.values,
-            name=f'Test Data ({len(y_test)} samples)',
+            name=f'Test Data ({len(X_test)} samples)',
             line=dict(color='#EF4444', width=2),
             fill='tozeroy', fillcolor='rgba(239,68,68,0.08)'
         ))
 
-        # Vertical split line using add_shape (avoids Plotly _mean bug with Timestamps)
-        split_date = y_test.index[0]
+        # Vertical split line using add_shape
+        split_date = X_test.index[0]
         fig_split.add_shape(
             type="line", x0=split_date, x1=split_date,
             y0=0, y1=1, yref="paper",
@@ -129,7 +141,7 @@ if st.sidebar.button("Run Detailed Analysis"):
 
         col_info1, col_info2, col_info3 = st.columns(3)
         with col_info1:
-            st.metric("Total Samples", len(X))
+            st.metric("Total Samples", len(df_feat))
         with col_info2:
             st.metric("Training Samples", len(X_train))
         with col_info3:
@@ -137,6 +149,7 @@ if st.sidebar.button("Run Detailed Analysis"):
         
         # ── Performance Metrics Table ──
         st.subheader("📋 Performance Metrics Comparison")
+        st.markdown("*Note: Models now predict returns, fundamentally testing forecasting accuracy over naive predictions. Metrics reflect the test-set price delta error.*")
         metrics_df = pd.DataFrame({
             name: {k: v for k, v in res.items() if k != 'model'} for name, res in results.items()
         }).T
@@ -150,29 +163,29 @@ if st.sidebar.button("Run Detailed Analysis"):
                 .highlight_min(axis=0, subset=['R2'], color='#991B1B')
                 .format(precision=4),
             use_container_width=True,
-            height=380
+            height=450
         )
         
         # ── Multi-Model Comparison: Actual vs Predicted ──
         st.subheader("📈 Actual vs Predicted — All Models")
         fig_comp = go.Figure()
         fig_comp.add_trace(go.Scatter(
-            x=y_test.index, y=y_test.values,
+            x=true_prices_test.index, y=true_prices_test.values,
             name='Actual Price',
             line=dict(color='white', width=3)
         ))
         for name, pred in predictions.items():
             fig_comp.add_trace(go.Scatter(
-                x=y_test.index, y=pred,
+                x=pred.index, y=pred.values,
                 name=f'{name}',
                 line=dict(color=MODEL_COLORS.get(name, 'gray'), dash='dot', width=1.5)
             ))
             
         fig_comp.update_layout(
-            title="All Models — Predicted vs Actual on Test Set",
+            title="All Models — Predicted vs Actual Price on Test Set",
             template="plotly_dark",
             xaxis_title="Date", yaxis_title="Price",
-            legend=dict(orientation="h", yanchor="bottom", y=-0.35, xanchor="center", x=0.5)
+            legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5)
         )
         st.plotly_chart(fig_comp, use_container_width=True)
         
@@ -191,15 +204,15 @@ if st.sidebar.button("Run Detailed Analysis"):
         fig_bar.update_layout(
             title="R² Score by Model (Higher is Better)",
             template="plotly_dark",
-            xaxis_title="Model", yaxis_title="R² Score",
-            yaxis_range=[min(0, metrics_df['R2'].min() - 0.05), 1.05]
+            xaxis_title="Model", yaxis_title="R² Score (Returns based)",
+            yaxis_range=[min(-1.0, metrics_df['R2'].min() - 0.1), min(1.0, metrics_df['R2'].max() + 0.1)]
         )
         st.plotly_chart(fig_bar, use_container_width=True)
 
         # ── N-Day Forecast ──
         st.subheader(f"🔮 {forecast_days}-Day Future Forecast")
-        with st.spinner(f"Generating future forecast from all models..."):
-             future_forecasts = forecast_n_days(df, results, feature_cols, forecast_days, engineer_features, scaler)
+        with st.spinner(f"Generating future forecast recursively from all models..."):
+             future_forecasts = forecast_n_days(df, results, fitted_models, feature_cols, forecast_days, engineer_features, scaler)
         
         future_dates = [df.index[-1] + timedelta(days=i) for i in range(1, forecast_days + 1)]
         
@@ -208,11 +221,12 @@ if st.sidebar.button("Run Detailed Analysis"):
         fig_fore.add_trace(go.Scatter(x=hist_context.index, y=hist_context['Close'], name='Recent Price', line=dict(color='white', width=2)))
         
         for name, forecast_vals in future_forecasts.items():
+            if not forecast_vals: continue
             full_dates = [df.index[-1]] + future_dates
             full_vals = [df['Close'].iloc[-1]] + forecast_vals
             fig_fore.add_trace(go.Scatter(
                 x=full_dates, y=full_vals,
-                name=f'Forecast: {name}',
+                name=f'{name} Forecast',
                 line=dict(color=MODEL_COLORS.get(name, 'gray'), width=2)
             ))
             
@@ -220,7 +234,7 @@ if st.sidebar.button("Run Detailed Analysis"):
             title=f"Next {forecast_days} Days Forecast — All Models",
             template="plotly_dark",
             xaxis_title="Date", yaxis_title="Price",
-            legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
+            legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5)
         )
         st.plotly_chart(fig_fore, use_container_width=True)
 
@@ -233,7 +247,8 @@ if st.sidebar.button("Run Detailed Analysis"):
              best_model = metrics_df['R2'].idxmax()
              st.metric("Best Model (R²)", best_model)
         with col3:
-             final_pred = future_forecasts[best_model][-1]
+             # Make sure the best model has a non-empty forecast
+             final_pred = future_forecasts[best_model][-1] if future_forecasts.get(best_model) else df['Close'].iloc[-1]
              st.metric(f"Forecasted Price (T+{forecast_days})", f"{final_pred:.2f}", delta=f"{final_pred - df['Close'].iloc[-1]:.2f}")
 
     else:

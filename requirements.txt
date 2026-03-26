@@ -7,3 +7,5 @@ xgboost
 plotly
 ta
 scipy
+statsmodels
+torch

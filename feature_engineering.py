@@ -26,11 +26,11 @@ def engineer_features(df):
     df['Close_Lag_2'] = df['Close'].shift(2)
     df['Close_Lag_3'] = df['Close'].shift(3)
     
-    # Returns
+    # Returns (Percentage Change)
     df['Returns'] = df['Close'].pct_change()
     
-    # Target Variable: Next Day's price
-    df['Target'] = df['Close'].shift(-1)
+    # Target Variable: Next Day's Return
+    df['Target'] = df['Returns'].shift(-1)
     
     # Drop rows with NaNs created by indicators/lags/target
     df.dropna(inplace=True)
