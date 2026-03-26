@@ -1,5 +1,5 @@
 import pandas as pd
-import pandas_ta as ta
+import ta
 import numpy as np
 
 def engineer_features(df):
@@ -9,18 +9,17 @@ def engineer_features(df):
     # Ensure dataframe is a copy to avoid SettingWithCopyWarning
     df = df.copy()
     
-    # Technical Indicators using pandas_ta
-    df['SMA_20'] = ta.sma(df['Close'], length=20)
-    df['SMA_50'] = ta.sma(df['Close'], length=50)
-    df['RSI_14'] = ta.rsi(df['Close'], length=14)
+    # Technical Indicators using ta library
+    df['SMA_20'] = ta.trend.sma_indicator(df['Close'], window=20)
+    df['SMA_50'] = ta.trend.sma_indicator(df['Close'], window=50)
+    df['RSI_14'] = ta.momentum.rsi(df['Close'], window=14)
     
     # MACD
-    macd = ta.macd(df['Close'])
-    df['MACD'] = macd['MACD_12_26_9']
-    df['MACD_Signal'] = macd['MACDs_12_26_9']
+    df['MACD'] = ta.trend.macd(df['Close'])
+    df['MACD_Signal'] = ta.trend.macd_signal(df['Close'])
     
     # Volatility (ATR)
-    df['ATR_14'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
+    df['ATR_14'] = ta.volatility.average_true_range(df['High'], df['Low'], df['Close'], window=14)
     
     # Lagged features
     df['Close_Lag_1'] = df['Close'].shift(1)

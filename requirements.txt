@@ -5,5 +5,5 @@ numpy
 scikit-learn
 xgboost
 plotly
-pandas_ta
+ta
 scipy
