@@ -31,7 +31,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🚀 Advanced Stock Prediction & Forecasting")
+st.title("Advanced Stock Prediction & Forecasting by Krish Jariwala")
 st.markdown("Comparing **9 ML models** and forecasting future prices.")
 
 # Sidebar

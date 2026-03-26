@@ -35,8 +35,8 @@ ml forecast/
 
 1. **Clone the repo**
    ```bash
-   git clone https://github.com/<your-username>/ml-forecast.git
-   cd ml-forecast
+   git clone https://github.com/krishjariwala11/Multimodal-ML-Stock-Forecasting-App.git
+   cd Multimodal-ML-Stock-Forecasting-App
    ```
 
 2. **Install dependencies**
