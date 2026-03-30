@@ -6,6 +6,8 @@ A Streamlit-powered ML application that compares **9 machine learning models** f
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-red?logo=streamlit)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3+-orange?logo=scikit-learn)
 
+🌐 **Live Demo:** [Multimodal Forecast](https://multimodal-forecast-krish.streamlit.app/)
+
 ## Features
 
 - **9 ML Models** trained and compared side-by-side:
